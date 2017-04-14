@@ -54,9 +54,11 @@ def initialize():
 	log.info("Created cms directory")
 	
 
+
 class StaticGen:
 
 	config = yaml.load(open("config.yml"))
+	log = get_log(config['logfile'])
 
 	def __init__(self):
 				
@@ -67,40 +69,52 @@ class StaticGen:
 			current_directory = os.path.join(root, ".")
 			directory_config = project_config
 			if os.path.isfile(current_directory+"/config.yml"):
+				self.log.info("Updating config with "+current_directory+"/config.yml")
 				directory_config.update(yaml.load(open(self.current_directory+"/config.yml").read()))
 
 			for dir in dirs:
 				os.system("mkdir -p "+os.path.join(self.config['static_directory'], dir))
 			
 			contents = []
-			for file_name in files:
+			files.sort(key=lambda file: os.path.getmtime(os.path.join(root, file)))
+			for file_name in files[::-1]:
 				file_name, extension = os.path.splitext(file_name)
 				file_path = os.path.join(root, file_name).lstrip(self.config['cms_directory']).rstrip(file_name)
 				
 				if extension == '.md':
 					file_config = directory_config
 					if os.path.isfile(os.path.join(root, file_name+".yml")):
+						self.log.info("Updating config with "+os.path.join(root, file_name+".yml"))
 						file_config.update(yaml.load(open(os.path.join(root, file_name+".yml")).read()))
-					content = self.get_content(file_name)
-					contents.append(content)
-					self.generate_static(file_name, file_path, content, file_config)
+					self.log.info("Reading content from "+os.path.join(root, file_name+".md"))
+					content = open(os.path.join(root, file_name+".md")).read().decode("UTF-8")
+					contents.append(markdown.markdown("\n".join(content.split("\n")[:5])))
+					
+					file_config['content'] = markdown.markdown(content)
+					file_config['static'] = "." + "/.."*(file_path.count("/")-1)
+					self.generate_static(file_name, file_path, file_config)
 			
 			dir = current_directory.split("/")[-2]
 			if dir!=self.config['cms_directory']:
-				self.generate_static(dir.lower(), file_path, "\n\n".join(contents), directory_config)
+
+				directory_config['content_list'] = contents
+				directory_config['static'] = "." + "/.."*(file_path.count("/")-1)
+				directory_config['template'] = directory_config['list_template']
+
+				self.generate_static(dir.lower(), file_path, directory_config)
 	
 	
-	def get_content(self, file_name):
-		return markdown.markdown(open(os.path.join(self.config['cms_directory'], file_name+".md")).read())
-	
-	def generate_static(self, file_name, file_path, content, config):
+
+	def generate_static(self, file_name, file_path, config):
 		
-		config['content'] = content
-		config['static'] = "." + "/.."*(file_path.count("/")-1)
-		template = open(self.config['template_directory']+"/"+config["template"]).read()
-		html = jinja2.Template(template).render(config)
+		self.log.info("Generating static page "+file_path+file_name+".html")
+		
+		environment = jinja2.environment.Environment()
+		environment.loader = jinja2.FileSystemLoader(self.config['template_directory'])
+		template = environment.get_template(config["template"])
+		html = template.render(config)
 		page = open(self.config['static_directory']+file_path+file_name+".html", "w")
-		page.write(html)
+		page.write(html.encode("UTF-8"))
 
 if __name__=="__main__":
 	args = parse_args()
