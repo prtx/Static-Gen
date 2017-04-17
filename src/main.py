@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 
-import argparse, os, yaml, markdown, jinja2
+import argparse, os, yaml, markdown, jinja2, datetime
 from utils import get_log
+from copy import deepcopy
+
 
 def parse_args(args=None):
 	
@@ -33,6 +35,7 @@ def initialize():
 		'cms_directory': "cms",
 		'logfile': "log.txt",
 		'template': input("Default template(index.html): ") or "index.html",
+		'list)template': input("Default list template: ") or "index.html",
 	}
 	
 	os.system("mkdir -p "+config['project_name'])
@@ -60,17 +63,15 @@ class StaticGen:
 	config = yaml.load(open("config.yml"))
 	log = get_log(config['logfile'])
 
-	def __init__(self):
+	def run(self):
 				
 		for root, dirs, files in os.walk(self.config['cms_directory']):
 			
-			project_config = self.config
+			project_config = deepcopy(self.config)
 			
 			current_directory = os.path.join(root, ".")
-			directory_config = project_config
-			if os.path.isfile(current_directory+"/config.yml"):
-				self.log.info("Updating config with "+current_directory+"/config.yml")
-				directory_config.update(yaml.load(open(self.current_directory+"/config.yml").read()))
+			directory_config = deepcopy(project_config)
+			directory_config = self.update_config(directory_config, current_directory+"/config.yml")
 
 			for dir in dirs:
 				os.system("mkdir -p "+os.path.join(self.config['static_directory'], dir))
@@ -82,13 +83,10 @@ class StaticGen:
 				file_path = os.path.join(root, file_name).lstrip(self.config['cms_directory']).rstrip(file_name)
 				
 				if extension == '.md':
-					file_config = directory_config
-					if os.path.isfile(os.path.join(root, file_name+".yml")):
-						self.log.info("Updating config with "+os.path.join(root, file_name+".yml"))
-						file_config.update(yaml.load(open(os.path.join(root, file_name+".yml")).read()))
-					self.log.info("Reading content from "+os.path.join(root, file_name+".md"))
-					content = open(os.path.join(root, file_name+".md")).read().decode("UTF-8")
-					contents.append(markdown.markdown("\n".join(content.split("\n")[:5])))
+					file_config = deepcopy(directory_config)
+					file_config = self.update_config(file_config, os.path.join(root, file_name+".yml"))
+					content, info = self.get_data(file_path+file_name)
+					contents.append(info)
 					
 					file_config['content'] = markdown.markdown(content)
 					file_config['static'] = "." + "/.."*(file_path.count("/")-1)
@@ -103,21 +101,43 @@ class StaticGen:
 
 				self.generate_static(dir.lower(), file_path, directory_config)
 	
+	def update_config(self, config, config_file):
+		
+		if os.path.isfile(config_file):
+			self.log.info("Updating config with "+config_file)
+			config.update(yaml.load(open(config_file).read()))
+
+		return config
+
+	def get_data(self, file_name):
+		
+		self.log.info("Reading content from "+file_name+".md")
+		cms_file = self.config['cms_directory']+file_name+".md"
+		content = open(cms_file).read()
+		time = os.path.getmtime(cms_file)
+		info = {
+			'content': markdown.markdown("\n".join(content.split("\n")[:5])+"..."),
+			'link': file_name+".html",
+			'time': datetime.datetime.fromtimestamp(time).strftime("%d %b %Y")
+		}
+
+		return content, info
 	
 
 	def generate_static(self, file_name, file_path, config):
 		
-		self.log.info("Generating static page "+file_path+file_name+".html")
+		self.log.info("Generating static page "+file_path+file_name+".html with template "+config['template'])
 		
 		environment = jinja2.environment.Environment()
 		environment.loader = jinja2.FileSystemLoader(self.config['template_directory'])
 		template = environment.get_template(config["template"])
 		html = template.render(config)
 		page = open(self.config['static_directory']+file_path+file_name+".html", "w")
-		page.write(html.encode("UTF-8"))
+		page.write(html)
 
 if __name__=="__main__":
 	args = parse_args()
 	'''if args.init:
 		initialize()'''
-	StaticGen()
+	a = StaticGen()
+	a.run()
