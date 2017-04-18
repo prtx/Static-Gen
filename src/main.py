@@ -19,13 +19,9 @@ def parse_args(args=None):
 	return parser.parse_args()
 
 
-def initialize():
-
-	"""
-	Initialize static-gen environment.
-	"""
+def generate_config():
 	
-	config = {
+	return {
 		'project_name': input("Project Name: "),
 		'site_title': input("Site Title: "),
 		'author': input("Author/s: "),
@@ -37,6 +33,15 @@ def initialize():
 		'template': input("Default template(index.html): ") or "index.html",
 		'list)template': input("Default list template: ") or "index.html",
 	}
+
+
+def initialize():
+
+	"""
+	Initialize static-gen environment.
+	"""
+	
+	config = generate_config()
 	
 	os.system("mkdir -p "+config['project_name'])
 	os.system("cd "+config['project_name'])
@@ -59,9 +64,10 @@ def initialize():
 
 
 class StaticGen:
-
-	config = yaml.load(open("config.yml"))
-	log = get_log(config['logfile'])
+	
+	def __init__(self):
+		self.config = yaml.load(open("config.yml"))
+		self.log = get_log(self.config['logfile'])
 
 	def run(self):
 				
@@ -78,7 +84,7 @@ class StaticGen:
 			
 			contents = []
 			files.sort(key=lambda file: os.path.getmtime(os.path.join(root, file)))
-			for file_name in files[::-1]:
+			for file_name in self.arrange_files(files):
 				file_name, extension = os.path.splitext(file_name)
 				file_path = os.path.join(root, file_name).lstrip(self.config['cms_directory']).rstrip(file_name)
 				
@@ -108,6 +114,11 @@ class StaticGen:
 			config.update(yaml.load(open(config_file).read()))
 
 		return config
+	
+	def arrange_files(self, files):
+
+		return files[::-1]
+
 
 	def get_data(self, file_name):
 		
@@ -137,7 +148,7 @@ class StaticGen:
 
 if __name__=="__main__":
 	args = parse_args()
-	'''if args.init:
-		initialize()'''
+	#if args.init:
+	#initialize()
 	a = StaticGen()
 	a.run()
