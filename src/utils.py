@@ -17,6 +17,6 @@ def get_log(log_file):
 	fileHandler.setFormatter(logFormatter)
 	logger.addHandler(fileHandler)
 	
-	logger.info("Created logfile "+log_file)
+	logger.info("Opened logfile "+log_file)
 
 	return logger

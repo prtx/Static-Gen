@@ -13,6 +13,8 @@ def parse_args(args=None):
 
 	parser = argparse.ArgumentParser(description="A simple python based static generator.")
 	parser.add_argument("--init", action="store_true", help="Initialize project.")
+	parser.add_argument("--gen", action="store_true", help="Generate static.")
+	parser.add_argument("--collect-static", action="store_true", help="Collect static.")
 
 	if args:
 		return parser.parse_args(args)
@@ -31,7 +33,7 @@ def generate_config():
 		'cms_directory': "cms",
 		'logfile': "log.txt",
 		'template': input("Default template(index.html): ") or "index.html",
-		'list)template': input("Default list template: ") or "index.html",
+		'list_template': input("Default list template: ") or "index.html",
 	}
 
 
@@ -66,8 +68,10 @@ def initialize():
 class StaticGen:
 	
 	def __init__(self):
+		
 		self.config = yaml.load(open("config.yml"))
 		self.log = get_log(self.config['logfile'])
+
 
 	def run(self):
 				
@@ -83,14 +87,15 @@ class StaticGen:
 				os.system("mkdir -p "+os.path.join(self.config['static_directory'], dir))
 			
 			contents = []
-			files.sort(key=lambda file: os.path.getmtime(os.path.join(root, file)))
+			files.sort(key=lambda file: os.path.getmtime(current_directory+'/'+file))
 			for file_name in self.arrange_files(files):
+				
 				file_name, extension = os.path.splitext(file_name)
 				file_path = os.path.join(root, file_name).lstrip(self.config['cms_directory']).rstrip(file_name)
 				
 				if extension == '.md':
 					file_config = deepcopy(directory_config)
-					file_config = self.update_config(file_config, os.path.join(root, file_name+".yml"))
+					file_config = self.update_config(file_config, self.config['cms_directory']+file_path+file_name+".yml")
 					content, info = self.get_data(file_path+file_name)
 					contents.append(info)
 					
@@ -146,9 +151,18 @@ class StaticGen:
 		page = open(self.config['static_directory']+file_path+file_name+".html", "w")
 		page.write(html)
 
+	def collect_static(self):
+
+		os.system("cp -Rf assets static/")
+		self.log.info("Generated static.")
+
 if __name__=="__main__":
 	args = parse_args()
-	#if args.init:
-	#initialize()
-	a = StaticGen()
-	a.run()
+	if args.init:
+		initialize()
+	
+	sg = StaticGen()
+	if args.gen:
+		sg.run()
+	if args.collect_static:
+		sg.collect_static()
